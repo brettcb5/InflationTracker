@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Track how consumer prices have changed from 2000 to today. Compare 200+ products across groceries, housing, healthcare, tech, vehicles and more.">
+  <meta name="theme-color" content="#0d1117">
+  <title>Price Inflation Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    :root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2330;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#e6edf3;--text2:#8b949e;--text3:#484f58;--accent:#f0a500;--red:#f85149;--green:#3fb950;--radius:10px;--radius-sm:6px}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+    /* HEADER */
+    header{border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;background:rgba(13,17,23,0.95);backdrop-filter:blur(12px);z-index:100}
+    .logo{font-family:'DM Serif Display',serif;font-size:20px;color:var(--text);display:flex;align-items:center;gap:10px}
+    .logo-dot{width:10px;height:10px;background:var(--accent);border-radius:50%;animation:pulse 2s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+    .hdr-right{display:flex;align-items:center;gap:10px}
+    .live-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:3px 10px}
+    .live-dot{width:6px;height:6px;border-radius:50%;background:var(--text3);flex-shrink:0}
+    .live-dot.on{background:var(--green);animation:pulse 1.5s infinite}
+    .api-btn{font-size:11px;color:var(--accent);background:rgba(240,165,0,.1);border:1px solid rgba(240,165,0,.25);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:'DM Sans',sans-serif}
+    .api-btn:hover{background:rgba(240,165,0,.2)}
+    /* MODAL */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem}
+    .modal-overlay.open{display:flex}
+    .modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:1.5rem;max-width:500px;width:100%}
+    .modal h3{font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:8px}
+    .modal p{font-size:13px;color:var(--text2);margin-bottom:1rem;line-height:1.65}
+    .mfield{margin-bottom:10px}
+    .mfield label{font-size:12px;color:var(--text3);display:block;margin-bottom:4px}
+    .mfield label a{color:var(--accent);text-decoration:none}
+    .mfield input{width:100%;padding:8px 10px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);outline:none}
+    .mfield input:focus{border-color:var(--accent)}
+    .modal-note{font-size:11px;color:var(--text3);margin-bottom:1rem;line-height:1.6}
+    .modal-actions{display:flex;gap:8px;justify-content:flex-end}
+    .btn-cancel{padding:7px 16px;font-size:13px;font-family:'DM Sans',sans-serif;background:none;border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text2);cursor:pointer}
+    .btn-save{padding:7px 16px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--accent);color:#0d1117;border:none;border-radius:var(--radius-sm);cursor:pointer;font-weight:500}
+    /* HERO */
+    .hero{text-align:center;padding:4rem 2rem 2.5rem;max-width:680px;margin:0 auto}
+    .eyebrow{font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:1rem}
+    .hero h1{font-family:'DM Serif Display',serif;font-size:clamp(2rem,5vw,3.2rem);line-height:1.15;margin-bottom:1rem}
+    .hero h1 em{font-style:italic;color:var(--accent)}
+    .hero-sub{font-size:15px;color:var(--text2);max-width:480px;margin:0 auto 1.5rem}
+    .hero-stats{display:flex;justify-content:center;gap:2rem;flex-wrap:wrap;margin-bottom:2.5rem}
+    .hstat-num{font-family:'DM Serif Display',serif;font-size:2rem;color:var(--accent)}
+    .hstat-lbl{font-size:12px;color:var(--text3)}
+    /* MAIN */
+    main{max-width:920px;margin:0 auto;padding:0 1.5rem 4rem}
+    /* LIVE BANNER */
+    .live-banner{background:rgba(63,185,80,.06);border:1px solid rgba(63,185,80,.2);border-radius:var(--radius);padding:10px 14px;margin-bottom:1rem;font-size:12px;color:var(--text2);display:none;align-items:center;gap:8px;flex-wrap:wrap}
+    .live-banner.show{display:flex}
+    .live-banner strong{color:var(--green)}
+    /* SEARCH */
+    .search-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.5rem}
+    .srow{display:flex;gap:10px;margin-bottom:1rem}
+    .sw{position:relative;flex:1}
+    .sw svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;stroke:var(--text3);fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
+    #si{width:100%;padding:0 12px 0 38px;height:42px;font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);outline:none;transition:border-color .15s}
+    #si:focus{border-color:var(--accent)}
+    #si::placeholder{color:var(--text3)}
+    #sb{padding:0 20px;height:42px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;background:var(--accent);color:#0d1117;border:none;border-radius:var(--radius-sm);cursor:pointer;white-space:nowrap}
+    #sb:hover{opacity:.88}
+    .sug{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);margin-top:4px;overflow:hidden;max-height:280px;overflow-y:auto;display:none;position:relative;z-index:50}
+    .sug.open{display:block}
+    .sug::-webkit-scrollbar{width:4px}
+    .sug::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+    .si-item{padding:9px 14px;font-size:13px;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border)}
+    .si-item:last-child{border-bottom:none}
+    .si-item:hover{background:var(--surface)}
+    .si-r{display:flex;align-items:center;gap:7px;flex-shrink:0}
+    .si-unit{font-size:11px;color:var(--text3)}
+    .si-cat{font-size:10px;color:var(--accent);background:rgba(240,165,0,.12);padding:2px 7px;border-radius:4px;font-weight:500}
+    .si-live{font-size:10px;color:var(--green);background:rgba(63,185,80,.12);padding:2px 6px;border-radius:4px}
+    /* CATS */
+    .cat-wrap{margin-bottom:10px}
+    .cat-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+    .cats{display:flex;flex-wrap:wrap;gap:6px}
+    .cf{padding:4px 12px;border:1px solid var(--border);border-radius:20px;font-size:12px;font-family:'DM Sans',sans-serif;color:var(--text2);cursor:pointer;background:none;transition:all .15s}
+    .cf:hover{border-color:var(--border2);color:var(--text)}
+    .cf.on{background:rgba(240,165,0,.15);border-color:var(--accent);color:var(--accent)}
+    .count-badge{font-size:11px;color:var(--text3);margin-top:8px}
+    .err{padding:10px 14px;background:rgba(248,81,73,.12);color:var(--red);border:1px solid rgba(248,81,73,.25);border-radius:var(--radius-sm);font-size:13px;margin-bottom:1rem;display:none}
+    /* CHIPS */
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1.25rem}
+    .chip{display:flex;align-items:center;gap:6px;padding:4px 8px 4px 12px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid}
+    .chip-cat{font-size:10px;opacity:.5}
+    .chip-live{font-size:9px;color:var(--green);background:rgba(63,185,80,.15);padding:1px 5px;border-radius:3px}
+    .chip button{background:none;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0;opacity:.4;color:inherit}
+    .chip button:hover{opacity:1}
+    /* METRICS */
+    .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.5rem}
+    .metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+    .metric-lbl{font-size:11px;color:var(--text3);margin-bottom:4px;display:flex;align-items:center;gap:5px}
+    .m-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+    .metric-val{font-family:'DM Serif Display',serif;font-size:22px;color:var(--text)}
+    .metric-sub{font-size:11px;color:var(--text3);margin-top:3px}
+    /* CHART */
+    .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1.25rem}
+    .chart-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px}
+    .chart-title{font-size:13px;font-weight:500;color:var(--text2)}
+    .leg{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--text2)}
+    .leg-item{display:flex;align-items:center;gap:5px}
+    .leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+    .chart-wrap{position:relative;width:100%;height:320px}
+    .chart-ctrls{display:flex;align-items:center;gap:20px;margin-top:1rem;font-size:12px;color:var(--text2);flex-wrap:wrap}
+    .chart-ctrls label{display:flex;align-items:center;gap:6px;cursor:pointer}
+    .chart-ctrls input[type=checkbox]{accent-color:var(--accent)}
+    /* TABLE */
+    .tbl-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;overflow-x:auto;margin-bottom:1.5rem}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{background:var(--surface2);font-weight:500;text-align:left;padding:9px 12px;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+    td{padding:7px 12px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:var(--surface2)}
+    .up{color:var(--red)}.dn{color:var(--green)}.na{color:var(--text3)}
+    .empty{text-align:center;padding:4rem 1rem;color:var(--text3);font-size:14px}
+    .empty-icon{font-size:3rem;margin-bottom:1rem}
+    footer{border-top:1px solid var(--border);padding:2rem;text-align:center;color:var(--text3);font-size:12px}
+    footer a{color:var(--text2);text-decoration:none}
+    footer a:hover{color:var(--accent)}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .fade-in{animation:fadeIn .3s ease forwards}
+    .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:4px}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    @media(max-width:600px){header{padding:0 1rem}.hero{padding:2.5rem 1rem 2rem}main{padding:0 1rem 3rem}.srow{flex-direction:column}#sb{width:100%}}
+  </style>
+</head>
+<body>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h3>Connect Live Data APIs</h3>
+    <p>Enter your free API keys to pull the latest 2025–2026 prices directly from government sources. Keys are saved only in your browser's localStorage and never leave your device.</p>
+    <div class="mfield">
+      <label>BLS API Key &mdash; <a href="https://data.bls.gov/registrationEngine/" target="_blank">Get free key →</a> (covers food, energy, medical)</label>
+      <input type="text" id="bls-in" placeholder="e.g. a1b2c3d4e5f6a1b2c3d4e5f6">
+    </div>
+    <div class="mfield">
+      <label>FRED API Key &mdash; <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank">Get free key →</a> (covers housing, wages, commodities)</label>
+      <input type="text" id="fred-in" placeholder="e.g. abcd1234efgh5678ijkl">
+    </div>
+    <p class="modal-note">Both APIs are free with no usage limits for personal use. Once saved, the tracker will automatically fetch the latest available annual data each time you open it.</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="modal-cancel">Cancel</button>
+      <button class="btn-save" id="modal-save">Save &amp; Fetch Live Data</button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="logo"><div class="logo-dot"></div>PriceTracker</div>
+  <div class="hdr-right">
+    <div class="live-badge"><div class="live-dot" id="live-dot"></div><span id="live-status">Static data</span></div>
+    <button class="api-btn" id="open-modal">⚡ Connect Live APIs</button>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="eyebrow">Consumer Price Inflation</div>
+  <h1>How much has <em>everything</em> gone up?</h1>
+  <p class="hero-sub">Search 200+ products across groceries, housing, healthcare, vehicles, tech and more. Connect free APIs to pull live 2025–2026 data automatically.</p>
+  <div class="hero-stats">
+    <div class="hstat"><div class="hstat-num">200+</div><div class="hstat-lbl">Products tracked</div></div>
+    <div class="hstat"><div class="hstat-num">26</div><div class="hstat-lbl">Years of data</div></div>
+    <div class="hstat"><div class="hstat-num">+98%</div><div class="hstat-lbl">Overall CPI since 2000</div></div>
+  </div>
+</div>
+
+<main>
+  <div id="live-banner" class="live-banner"></div>
+
+  <div class="search-card">
+    <div class="srow">
+      <div class="sw">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="si" type="text" placeholder="Search anything: eggs, iPhone, rent, gasoline, insulin, Bitcoin, braces…" autocomplete="off">
+      </div>
+      <button id="sb">Add to chart</button>
+    </div>
+    <div id="sug" class="sug"></div>
+    <div class="cat-wrap">
+      <div class="cat-label">Browse by category</div>
+      <div class="cats" id="cats"></div>
+    </div>
+    <div class="count-badge" id="count-badge"></div>
+  </div>
+
+  <div id="err" class="err"></div>
+  <div id="chips" class="chips"></div>
+  <div id="content"><div class="empty"><div class="empty-icon">📈</div>Search for a product above to see its price history</div></div>
+</main>
+
+<footer>
+  <p>Historical data: BLS, USDA, Federal Reserve, FRED, AAA, Zillow Research, Kaiser Family Foundation &amp; industry reports.</p>
+  <p style="margin-top:6px">Live updates via <a href="https://www.bls.gov/developers/" target="_blank">BLS Public API</a> &amp; <a href="https://fred.stlouisfed.org/docs/api/" target="_blank">FRED API</a> &nbsp;·&nbsp; Built with Chart.js</p>
+</footer>
+
+<script>
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const YRS=[2000,2002,2004,2006,2008,2010,2012,2014,2016,2018,2020,2022,2024,2025,2026];
+const CPI=[1.00,1.05,1.11,1.17,1.24,1.27,1.33,1.37,1.39,1.44,1.47,1.62,1.82,1.98,null];
+const PAL=['#58a6ff','#3fb950','#f85149','#e3b341','#bc8cff','#ff7b72','#56d364','#8b949e'];
+
+// ── DATABASE (200+ items) ─────────────────────────────────────────────────────
+// p[] aligns to YRS[]: 2000,2002,2004,2006,2008,2010,2012,2014,2016,2018,2020,2022,2024,2025,2026
+// null = data unavailable for that year
+// blsSeries / fredSeries = live API series IDs (auto-fetched when keys are set)
+const DB={
+  // GROCERIES
+  "Honey Nut Cheerios":     {cat:"Groceries",unit:"18oz box",       tags:["cereal","breakfast","cheerios","general mills"],                      p:[2.99,3.29,3.49,3.79,3.99,4.19,4.49,4.79,4.99,5.29,5.49,5.99,6.49,6.79,null]},
+  "Frosted Flakes":         {cat:"Groceries",unit:"13.5oz box",     tags:["cereal","kelloggs","breakfast"],                                       p:[2.49,2.69,2.89,3.09,3.29,3.49,3.79,3.99,4.19,4.39,4.59,4.99,5.49,5.79,null]},
+  "Corn Flakes":            {cat:"Groceries",unit:"18oz box",       tags:["cereal","kelloggs","breakfast"],                                       p:[2.29,2.49,2.59,2.79,2.99,3.09,3.29,3.49,3.59,3.79,3.99,4.39,4.99,5.19,null]},
+  "Oatmeal (canister)":     {cat:"Groceries",unit:"42oz",           tags:["quaker oats","oats","breakfast","porridge"],                           p:[2.99,3.19,3.29,3.39,3.99,3.79,3.99,4.19,4.29,4.49,4.79,5.49,5.99,6.29,null]},
+  "Granola bars (box)":     {cat:"Groceries",unit:"8-count",        tags:["granola","nature valley","snack","breakfast bar"],                     p:[2.49,2.69,2.89,2.99,3.29,3.39,3.59,3.79,3.89,4.09,4.29,4.99,5.49,5.79,null]},
+  "Dozen eggs":             {cat:"Groceries",unit:"dozen",          tags:["eggs","egg"],                       blsSeries:"APU0000706111",          p:[0.91,0.93,1.07,1.31,1.93,1.54,1.74,1.89,1.32,1.54,1.48,2.51,3.37,3.20,null]},
+  "Gallon of milk":         {cat:"Groceries",unit:"gallon",         tags:["milk","dairy","whole milk"],        blsSeries:"APU0000709112",          p:[2.79,2.90,2.90,3.30,3.69,3.26,3.65,3.69,3.25,2.85,3.32,4.01,3.79,3.85,null]},
+  "Almond milk (half gal)": {cat:"Groceries",unit:"half gallon",    tags:["almond milk","milk alternative","dairy free"],                         p:[null,null,null,null,3.49,3.79,3.99,4.09,3.99,4.09,4.19,4.49,4.79,4.99,null]},
+  "Butter (lb)":            {cat:"Groceries",unit:"per lb",         tags:["butter","dairy"],                   blsSeries:"APU0000FS1101",          p:[2.29,2.49,2.79,3.19,3.39,2.69,2.89,3.79,3.49,3.09,3.49,4.69,5.29,5.49,null]},
+  "Cheddar cheese (lb)":    {cat:"Groceries",unit:"per lb",         tags:["cheese","cheddar","dairy"],                                            p:[3.49,3.79,3.99,4.29,4.59,4.29,4.69,5.19,5.29,5.19,5.49,6.49,6.99,7.19,null]},
+  "Mozzarella (lb)":        {cat:"Groceries",unit:"per lb",         tags:["cheese","mozzarella","pizza","dairy"],                                 p:[3.29,3.49,3.79,3.99,4.29,4.09,4.39,4.79,4.89,4.79,5.09,5.99,6.49,6.79,null]},
+  "Greek yogurt (32oz)":    {cat:"Groceries",unit:"32oz tub",       tags:["yogurt","chobani","fage","dairy"],                                     p:[null,null,null,null,3.99,4.49,4.99,5.29,5.49,5.69,5.79,6.49,6.99,7.19,null]},
+  "Orange juice (64oz)":    {cat:"Groceries",unit:"64oz carton",    tags:["oj","juice","tropicana","simply orange"],                               p:[2.49,2.69,2.79,2.99,3.49,3.79,3.89,3.99,3.99,4.29,4.39,5.29,8.49,9.29,null]},
+  "Apple juice (64oz)":     {cat:"Groceries",unit:"64oz jug",       tags:["juice","apple juice","mott"],                                          p:[2.29,2.39,2.49,2.59,2.79,2.89,2.99,3.19,3.29,3.49,3.59,3.99,4.29,4.49,null]},
+  "Ground beef (lb)":       {cat:"Groceries",unit:"80/20 per lb",   tags:["beef","hamburger","meat","ground beef"], blsSeries:"APU0000703112",    p:[1.63,1.83,2.10,2.31,2.50,2.89,3.25,3.84,4.24,3.90,4.06,5.11,5.46,5.65,null]},
+  "Steak (ribeye lb)":      {cat:"Groceries",unit:"per lb",         tags:["steak","ribeye","beef","meat"],                                        p:[5.99,6.49,7.49,8.49,9.49,8.99,9.49,10.49,11.49,12.49,12.99,16.49,18.99,19.99,null]},
+  "Chicken breast (lb)":    {cat:"Groceries",unit:"boneless per lb",tags:["chicken","poultry","meat"],         blsSeries:"APU0000706212",         p:[1.89,1.93,2.05,2.19,2.38,2.29,2.45,3.01,3.25,2.95,2.88,3.56,3.79,3.90,null]},
+  "Pork chops (lb)":        {cat:"Groceries",unit:"center cut per lb",tags:["pork","chops","meat"],                                               p:[2.99,3.09,3.19,3.29,3.59,3.29,3.49,3.79,3.89,3.79,3.99,4.99,5.49,5.69,null]},
+  "Bacon (lb)":             {cat:"Groceries",unit:"per lb",         tags:["bacon","pork","meat"],              blsSeries:"APU0000704111",         p:[2.49,2.69,2.99,3.29,3.89,3.89,4.29,5.28,5.53,4.99,5.27,7.09,7.89,8.10,null]},
+  "Turkey (whole lb)":      {cat:"Groceries",unit:"per lb frozen",  tags:["turkey","thanksgiving","poultry"],                                     p:[0.79,0.79,0.79,0.89,0.99,0.99,1.09,1.29,1.29,1.39,1.49,1.79,2.09,2.29,null]},
+  "Salmon (lb)":            {cat:"Groceries",unit:"Atlantic per lb",tags:["fish","salmon","seafood"],                                             p:[4.99,5.49,6.29,6.99,7.49,7.29,7.99,8.49,8.99,9.49,9.99,12.49,13.99,14.49,null]},
+  "Shrimp (lb)":            {cat:"Groceries",unit:"frozen per lb",  tags:["shrimp","seafood","fish"],                                             p:[4.49,4.49,4.69,4.99,5.49,4.99,5.49,5.99,6.49,6.99,7.49,8.99,9.99,10.49,null]},
+  "Tuna can":               {cat:"Groceries",unit:"5oz can",        tags:["tuna","fish","starkist","bumble bee"],                                  p:[0.69,0.72,0.79,0.89,0.99,0.99,1.09,1.09,1.09,1.19,1.29,1.49,1.69,1.79,null]},
+  "Hot dogs (pack)":        {cat:"Groceries",unit:"16oz 8-pack",    tags:["hotdogs","franks","ballpark","oscar mayer","sausage"],                  p:[2.29,2.39,2.49,2.59,2.99,2.79,2.99,3.29,3.49,3.29,3.49,4.49,4.99,5.29,null]},
+  "Bread (loaf)":           {cat:"Groceries",unit:"white sandwich",  tags:["bread","white bread","wonder bread"], blsSeries:"APU0000702111",      p:[0.99,1.09,1.09,1.19,1.37,1.39,1.42,1.45,1.35,1.39,1.53,1.87,2.09,2.19,null]},
+  "Whole wheat bread":      {cat:"Groceries",unit:"loaf",           tags:["bread","wheat","whole grain","pepperidge"],                            p:[2.29,2.49,2.69,2.99,3.29,3.19,3.29,3.49,3.49,3.69,3.89,4.39,4.99,5.19,null]},
+  "Sourdough bread":        {cat:"Groceries",unit:"loaf",           tags:["bread","sourdough","bakery","artisan"],                                p:[2.49,2.69,2.89,3.09,3.39,3.39,3.59,3.79,3.99,4.19,4.49,5.29,5.99,6.29,null]},
+  "Pasta (1lb)":            {cat:"Groceries",unit:"1lb spaghetti",  tags:["pasta","spaghetti","noodles","barilla"],                               p:[0.89,0.92,0.99,1.09,1.29,1.19,1.25,1.29,1.29,1.39,1.49,1.99,2.19,2.29,null]},
+  "White rice (5lb)":       {cat:"Groceries",unit:"5lb bag",        tags:["rice","white rice"],                                                   p:[2.49,2.59,2.69,2.79,3.29,2.99,3.19,3.29,3.29,3.49,3.69,4.49,4.99,5.19,null]},
+  "Canned tomatoes":        {cat:"Groceries",unit:"14.5oz can",     tags:["tomatoes","canned","hunt","del monte"],                               p:[0.69,0.72,0.79,0.85,0.95,0.99,1.05,1.09,1.09,1.19,1.29,1.49,1.69,1.79,null]},
+  "Canned beans":           {cat:"Groceries",unit:"15oz can",       tags:["beans","black beans","kidney","chickpeas"],                            p:[0.59,0.62,0.69,0.75,0.89,0.89,0.95,0.99,0.99,1.09,1.19,1.39,1.59,1.69,null]},
+  "Canned soup":            {cat:"Groceries",unit:"10.75oz Campbell's",tags:["soup","campbell","chicken noodle"],                                  p:[0.79,0.85,0.89,0.95,1.09,1.09,1.19,1.29,1.39,1.49,1.59,1.89,2.09,2.19,null]},
+  "Peanut butter (16oz)":   {cat:"Groceries",unit:"16oz jar",       tags:["peanut butter","jif","skippy"],                                        p:[1.99,2.09,2.19,2.29,2.79,2.89,3.19,3.49,3.49,3.69,3.79,4.49,4.99,5.19,null]},
+  "Jelly / jam (18oz)":     {cat:"Groceries",unit:"18oz jar",       tags:["jam","jelly","smucker","grape jelly"],                                 p:[1.99,2.09,2.19,2.29,2.49,2.59,2.79,2.89,2.89,2.99,3.19,3.79,4.29,4.49,null]},
+  "Coffee (lb)":            {cat:"Groceries",unit:"per lb ground",  tags:["coffee","folgers","maxwell house"],  blsSeries:"APU0000717311",        p:[3.49,3.29,3.39,3.79,4.29,4.99,7.49,6.29,5.69,6.29,6.99,8.49,9.49,9.89,null]},
+  "Avocado":                {cat:"Groceries",unit:"each",           tags:["avocado","guacamole"],                                                  p:[0.59,0.69,0.75,0.89,0.99,0.79,0.89,0.99,1.25,1.75,1.29,1.49,1.79,1.89,null]},
+  "Bananas (lb)":           {cat:"Groceries",unit:"per lb",         tags:["banana","fruit"],                                                       p:[0.29,0.30,0.32,0.34,0.36,0.37,0.39,0.40,0.41,0.42,0.44,0.49,0.59,0.63,null]},
+  "Apples (lb)":            {cat:"Groceries",unit:"per lb",         tags:["apples","gala","fuji","fruit"],                                         p:[0.79,0.85,0.89,0.95,1.09,1.19,1.29,1.39,1.45,1.49,1.69,1.99,2.09,2.19,null]},
+  "Strawberries (pint)":    {cat:"Groceries",unit:"16oz pint",      tags:["strawberries","berries","fruit"],                                       p:[1.99,2.19,2.29,2.49,2.69,2.49,2.79,2.99,2.99,3.29,3.49,3.99,4.29,4.49,null]},
+  "Blueberries (pint)":     {cat:"Groceries",unit:"pint",           tags:["blueberries","berries","fruit"],                                        p:[2.49,2.59,2.79,2.99,3.29,2.99,3.29,3.49,3.49,3.79,3.99,4.49,4.99,5.19,null]},
+  "Broccoli (lb)":          {cat:"Groceries",unit:"per lb",         tags:["broccoli","vegetable","veggie","produce"],                              p:[0.89,0.99,1.09,1.19,1.29,1.19,1.35,1.49,1.59,1.69,1.79,1.99,2.19,2.29,null]},
+  "Tomatoes (lb)":          {cat:"Groceries",unit:"per lb",         tags:["tomatoes","vegetable","produce"],                                       p:[1.19,1.29,1.39,1.49,1.59,1.49,1.59,1.69,1.79,1.89,1.99,2.19,2.39,2.49,null]},
+  "Potatoes (5lb)":         {cat:"Groceries",unit:"5lb bag",        tags:["potatoes","russet","vegetable","produce"],                              p:[1.99,2.09,2.19,2.29,2.49,2.39,2.49,2.69,2.69,2.79,2.99,3.49,3.99,4.19,null]},
+  "Onions (3lb)":           {cat:"Groceries",unit:"3lb bag",        tags:["onions","vegetable","produce"],                                         p:[1.29,1.39,1.49,1.59,1.79,1.59,1.69,1.79,1.79,1.89,1.99,2.29,2.49,2.59,null]},
+  "Bagged salad":           {cat:"Groceries",unit:"10oz bag",       tags:["salad","lettuce","mixed greens","dole"],                                p:[2.49,2.59,2.69,2.79,2.99,2.99,3.19,3.29,3.29,3.49,3.59,3.99,4.39,4.59,null]},
+  "Potato chips (8oz)":     {cat:"Groceries",unit:"8oz bag",        tags:["chips","lays","doritos","snacks","frito lay"],                          p:[2.99,3.19,3.29,3.49,3.69,3.79,3.99,4.19,4.29,4.49,4.69,5.29,5.99,6.29,null]},
+  "Crackers (Ritz)":        {cat:"Groceries",unit:"13.7oz box",     tags:["crackers","ritz","snacks","nabisco"],                                   p:[2.29,2.49,2.59,2.79,2.99,2.99,3.19,3.39,3.49,3.69,3.89,4.49,4.99,5.19,null]},
+  "Coca-Cola (2L)":         {cat:"Groceries",unit:"2-liter bottle", tags:["coke","coca cola","soda","pop"],                                       p:[0.99,1.09,1.19,1.29,1.49,1.49,1.59,1.69,1.79,1.89,1.99,2.29,2.49,2.59,null]},
+  "Bottled water (24-pack)":{cat:"Groceries",unit:"case of 24",     tags:["water","dasani","aquafina","poland spring"],                            p:[3.99,4.29,4.49,4.69,4.99,4.99,5.19,5.29,5.29,5.49,5.49,5.99,6.49,6.79,null]},
+  "Sports drink (32oz)":    {cat:"Groceries",unit:"32oz Gatorade",  tags:["gatorade","powerade","sports drink","electrolytes"],                   p:[0.89,0.99,1.09,1.19,1.29,1.29,1.39,1.49,1.59,1.69,1.79,1.99,2.19,2.29,null]},
+  "Energy drink":           {cat:"Groceries",unit:"16oz Red Bull",  tags:["energy drink","red bull","monster","celsius"],                         p:[null,1.99,2.29,2.49,2.69,2.79,2.99,3.09,3.09,3.29,3.49,3.99,4.29,4.49,null]},
+  "Sugar (5lb)":            {cat:"Groceries",unit:"5lb bag",        tags:["sugar","white sugar","domino"],                                         p:[1.99,2.09,2.19,2.29,2.49,2.29,2.49,2.69,2.69,2.79,2.89,3.99,4.49,4.69,null]},
+  "All-purpose flour (5lb)":{cat:"Groceries",unit:"5lb bag",        tags:["flour","baking","gold medal","pillsbury"],                              p:[1.29,1.39,1.49,1.59,2.09,1.89,2.09,2.29,2.29,2.49,2.69,3.99,4.49,4.69,null]},
+  "Olive oil (16oz)":       {cat:"Groceries",unit:"16oz bottle",    tags:["olive oil","oil","cooking oil"],                                        p:[4.99,5.49,5.99,6.49,6.99,6.49,6.99,7.49,7.49,7.99,8.49,9.99,11.99,12.99,null]},
+  "Vegetable oil (48oz)":   {cat:"Groceries",unit:"48oz jug",       tags:["vegetable oil","canola oil","cooking oil"],                             p:[2.49,2.59,2.69,2.99,4.29,3.29,3.49,3.69,3.59,3.69,3.79,5.49,6.49,6.79,null]},
+  "Frozen pizza":           {cat:"Groceries",unit:"DiGiorno 12in",  tags:["pizza","frozen","digiorno"],                                            p:[4.49,4.69,4.89,4.99,5.29,5.49,5.69,5.99,5.99,6.29,6.49,7.49,8.99,9.29,null]},
+  "Frozen vegetables":      {cat:"Groceries",unit:"12oz bag",       tags:["frozen peas","frozen corn","vegetables","birds eye"],                   p:[1.09,1.19,1.29,1.39,1.59,1.59,1.69,1.79,1.89,1.99,2.09,2.39,2.79,2.99,null]},
+  "Ice cream (48oz)":       {cat:"Groceries",unit:"48oz carton",    tags:["ice cream","breyers","haagen dazs","frozen dessert"],                   p:[3.49,3.69,3.89,3.99,4.29,4.29,4.49,4.79,4.79,4.99,5.19,5.99,6.99,7.29,null]},
+  "Baby formula (12.5oz)":  {cat:"Groceries",unit:"12.5oz powder",  tags:["baby formula","similac","enfamil","infant formula"],                    p:[9.99,10.99,12.49,13.99,15.49,16.99,18.49,19.99,21.49,22.99,24.49,27.99,30.99,32.49,null]},
+  "Diapers (box)":          {cat:"Groceries",unit:"size 2, 36-count",tags:["diapers","pampers","huggies","baby"],                                  p:[7.99,8.49,9.49,10.49,11.49,11.99,12.99,13.99,14.99,15.99,17.99,20.99,23.99,25.49,null]},
+  "Dog food (30lb)":        {cat:"Groceries",unit:"30lb dry bag",   tags:["dog food","pedigree","purina","pet food","dog"],                       p:[12.99,13.99,14.99,15.99,18.99,18.99,20.99,22.99,24.99,27.99,29.99,36.99,42.99,45.49,null]},
+  "Cat food (16lb)":        {cat:"Groceries",unit:"16lb dry bag",   tags:["cat food","meow mix","purina","pet food","cat"],                       p:[8.99,9.49,9.99,10.99,12.99,12.99,13.99,14.99,15.99,17.99,19.99,23.99,27.99,29.49,null]},
+  // RESTAURANTS
+  "Starbucks latte":        {cat:"Restaurants",unit:"grande latte",  tags:["coffee","starbucks","latte","cafe"],                                   p:[2.75,2.95,3.15,3.45,3.80,3.95,4.25,4.55,4.65,4.85,5.25,5.75,6.35,6.75,null]},
+  "Big Mac":                {cat:"Restaurants",unit:"sandwich",      tags:["big mac","mcdonalds","fast food","burger"],                            p:[2.39,2.59,2.79,3.10,3.54,3.73,4.33,4.80,3.99,3.99,3.99,5.15,5.89,6.39,null]},
+  "Chipotle burrito":       {cat:"Restaurants",unit:"burrito",       tags:["chipotle","burrito","mexican","fast casual"],                          p:[null,null,5.49,5.79,5.99,6.19,6.50,6.85,6.90,7.40,7.50,8.50,10.10,10.90,null]},
+  "Subway footlong":        {cat:"Restaurants",unit:"12-inch sub",   tags:["subway","sandwich","sub","footlong"],                                  p:[3.99,4.49,4.99,5.00,5.00,5.00,5.00,5.00,5.99,6.49,7.49,10.99,12.99,13.99,null]},
+  "Pizza slice (NY)":       {cat:"Restaurants",unit:"plain slice",   tags:["pizza","slice","new york","ny pizza"],                                 p:[1.50,1.75,2.00,2.25,2.50,2.50,2.75,2.75,2.75,3.00,3.00,3.50,4.00,4.50,null]},
+  "Restaurant entree (avg)":{cat:"Restaurants",unit:"avg sit-down",  tags:["restaurant","dinner","entree","dining out"],                          p:[12.00,13.00,14.00,15.50,17.00,17.50,18.50,19.50,20.50,21.50,22.50,26.00,29.00,30.50,null]},
+  "Taco Bell combo":        {cat:"Restaurants",unit:"combo meal",    tags:["taco bell","fast food","mexican","combo"],                             p:[3.49,3.79,3.99,4.49,4.99,5.29,5.49,5.79,5.99,6.49,6.99,8.49,9.99,10.49,null]},
+  "Chick-fil-A sandwich":   {cat:"Restaurants",unit:"chicken sandwich",tags:["chick fil a","chicken","fast food"],                                 p:[2.39,2.59,2.79,2.99,3.29,3.49,3.69,3.89,4.09,4.29,4.49,5.29,5.99,6.29,null]},
+  "Domino's large pizza":   {cat:"Restaurants",unit:"large 2-topping",tags:["dominos","pizza","delivery","carry out"],                            p:[9.99,10.99,11.99,12.99,13.99,13.99,14.99,14.99,15.99,16.99,17.99,19.99,21.99,23.49,null]},
+  "Sushi roll (avg)":       {cat:"Restaurants",unit:"per roll",      tags:["sushi","japanese","roll","restaurant"],                               p:[4.99,5.49,5.99,6.49,6.99,7.49,7.99,8.49,9.49,10.49,11.49,13.49,15.49,16.49,null]},
+  // FUEL
+  "Gasoline (regular)":     {cat:"Fuel",unit:"gallon regular",       tags:["gas","gasoline","petrol","fuel","unleaded"], blsSeries:"APU000074714", fredSeries:"GASREGCOVW", p:[1.51,1.36,1.88,2.59,3.27,2.78,3.63,3.37,2.14,2.72,2.17,3.99,3.31,3.18,null]},
+  "Gasoline (premium)":     {cat:"Fuel",unit:"gallon premium",       tags:["premium gas","high octane","fuel"],          blsSeries:"APU000074716",  p:[1.70,1.55,2.08,2.78,3.50,3.01,3.86,3.59,2.35,2.95,2.40,4.23,3.56,3.43,null]},
+  "Diesel":                 {cat:"Fuel",unit:"gallon diesel",        tags:["diesel","truck fuel"],                                                  p:[1.30,1.32,1.81,2.71,3.80,2.99,3.97,3.83,2.30,3.18,2.55,5.03,3.78,3.65,null]},
+  "EV charging (kWh)":      {cat:"Fuel",unit:"public DC fast charge",tags:["electric vehicle","ev","charging","tesla supercharger"],               p:[null,null,null,null,null,null,null,null,0.28,0.28,0.29,0.33,0.34,0.35,null]},
+  // UTILITIES
+  "Electric bill (monthly)":{cat:"Utilities",unit:"avg household/mo",tags:["electricity","electric","utility","power","kwh"], blsSeries:"APU000072610", p:[72,76,82,92,107,107,114,114,112,117,115,122,135,142,null]},
+  "Natural gas bill":       {cat:"Utilities",unit:"avg household/mo",tags:["gas bill","natural gas","heating","utility"],                          p:[55,58,65,79,85,72,75,72,63,67,61,93,99,95,null]},
+  "Water bill (monthly)":   {cat:"Utilities",unit:"avg household/mo",tags:["water bill","sewer","utility"],                                        p:[24,27,29,32,36,40,44,49,55,60,65,73,82,87,null]},
+  "Internet service":       {cat:"Utilities",unit:"broadband/mo",    tags:["internet","broadband","wifi","comcast","att"],                         p:[29,35,40,43,46,49,52,55,58,60,65,70,75,79,null]},
+  "Cell phone plan":        {cat:"Utilities",unit:"single line/mo",  tags:["phone plan","cell phone","mobile","verizon","wireless"],               p:[45,49,55,60,65,60,60,55,50,40,35,30,30,30,null]},
+  "Cable TV":               {cat:"Utilities",unit:"basic package/mo",tags:["cable","tv","comcast","directv","television"],                         p:[29,35,40,47,55,60,70,75,80,88,90,95,100,105,null]},
+  "Home security (monthly)":{cat:"Utilities",unit:"monitoring/mo",   tags:["adt","home security","alarm","monitoring"],                            p:[null,null,24.99,26.99,28.99,28.99,32.99,35.99,39.99,44.99,44.99,49.99,54.99,59.99,null]},
+  // VEHICLES
+  "Toyota Camry":           {cat:"Vehicles",unit:"base MSRP",        tags:["camry","toyota","sedan","car"],                                        p:[17998,19920,20510,21340,23070,21500,22235,23450,23070,24000,24425,26320,28400,29000,null]},
+  "Honda Civic":            {cat:"Vehicles",unit:"base MSRP",        tags:["civic","honda","sedan","car"],                                         p:[14065,15410,16260,17110,18065,15995,17965,18390,19475,20050,21050,23950,27295,28100,null]},
+  "Ford F-150":             {cat:"Vehicles",unit:"base MSRP",        tags:["f150","ford","pickup","truck"],                                        p:[18770,20205,22895,24590,26650,22110,25195,27705,27110,28155,28745,34585,37030,38500,null]},
+  "Chevy Silverado":        {cat:"Vehicles",unit:"base MSRP",        tags:["silverado","chevy","chevrolet","truck","pickup"],                      p:[19285,21055,23650,26065,28355,25015,25995,27535,28900,29795,32795,37895,40300,42000,null]},
+  "Honda CR-V":             {cat:"Vehicles",unit:"base MSRP",        tags:["crv","honda","suv"],                                                   p:[18980,20280,21205,21595,22795,21545,22795,24050,24945,25150,26400,30895,34200,35500,null]},
+  "Tesla Model 3":          {cat:"Vehicles",unit:"base MSRP",        tags:["tesla","model 3","electric car","ev"],                                 p:[null,null,null,null,null,null,null,null,null,35000,37990,43990,38990,36990,null]},
+  "Toyota RAV4":            {cat:"Vehicles",unit:"base MSRP",        tags:["rav4","toyota","suv","crossover"],                                     p:[15900,17215,19495,21625,21975,22615,24170,25285,25430,26220,26250,29650,31025,32000,null]},
+  "Jeep Wrangler":          {cat:"Vehicles",unit:"base MSRP",        tags:["jeep","wrangler","4x4","offroad","suv"],                               p:[14715,15990,17430,18425,22945,22145,23895,24995,27695,28045,29995,31990,32995,34000,null]},
+  "New car (avg price)":    {cat:"Vehicles",unit:"avg transaction",  tags:["car","automobile","vehicle","new car"],                                p:[24500,27700,29700,31000,28250,29000,30800,32500,34600,36500,38723,46526,48244,48500,null]},
+  "Used car (avg price)":   {cat:"Vehicles",unit:"avg used",         tags:["used car","pre-owned","secondhand","vehicle"],                        p:[11500,12000,12500,13200,13800,13500,14000,15000,17500,19800,25500,28000,25000,26000,null]},
+  "Car insurance (annual)": {cat:"Vehicles",unit:"avg annual premium",tags:["car insurance","auto insurance","insurance"],                         p:[785,850,910,960,1010,1029,1124,1185,1347,1457,1517,1771,2114,2250,null]},
+  "Vehicle registration":   {cat:"Vehicles",unit:"avg state fee",   tags:["registration","dmv","license plate"],                                  p:[44,46,49,54,60,67,76,83,91,98,104,115,128,135,null]},
+  // HOUSING
+  "Median home price":      {cat:"Housing",unit:"US median sale",    tags:["home","house","real estate","housing","property"], fredSeries:"MSPUS", p:[119600,158300,185200,222000,232100,221800,177400,188900,232200,261500,329000,428700,417700,420000,null]},
+  "Apartment rent (1BR)":   {cat:"Housing",unit:"avg 1BR/mo",        tags:["rent","apartment","1 bedroom","rental"],           fredSeries:"CUUR0000SEHA", p:[670,710,755,800,845,871,905,945,990,1040,1124,1342,1505,1575,null]},
+  "Apartment rent (2BR)":   {cat:"Housing",unit:"avg 2BR/mo",        tags:["rent","apartment","2 bedroom","rental"],                               p:[805,860,915,975,1040,1066,1115,1165,1230,1295,1402,1694,1889,1980,null]},
+  "Homeowner's insurance":  {cat:"Housing",unit:"avg annual",        tags:["home insurance","homeowners","insurance","property"],                  p:[618,699,769,822,894,952,1000,1034,1083,1192,1311,1544,1903,2050,null]},
+  "30-yr mortgage rate":    {cat:"Housing",unit:"avg % rate",        tags:["mortgage","interest rate","home loan","30 year"],  fredSeries:"MORTGAGE30US", p:[8.05,6.54,5.84,6.41,6.03,4.69,3.66,4.17,3.65,4.54,3.11,5.34,6.72,6.65,null]},
+  "Property tax (avg)":     {cat:"Housing",unit:"avg annual",        tags:["property tax","real estate tax","taxes"],                              p:[1400,1500,1700,1900,2100,2200,2300,2400,2500,2700,2800,3100,3500,3700,null]},
+  "Home renovation (sqft)": {cat:"Housing",unit:"avg $/sqft full reno",tags:["renovation","remodel","construction","home improvement"],            p:[80,85,90,100,110,105,115,125,135,145,155,185,210,225,null]},
+  // EDUCATION
+  "College tuition (public)":{cat:"Education",unit:"4-yr public/yr",tags:["college","university","tuition","school","education"],                 p:[3510,4081,5132,5836,6585,7605,8655,9139,9650,10230,10560,10740,11260,11610,null]},
+  "College tuition (private)":{cat:"Education",unit:"4-yr private/yr",tags:["college","private","ivy league","university"],                       p:[16233,18950,21235,23712,25143,27293,29056,31231,33480,35676,37650,39400,42162,43800,null]},
+  "Textbook (avg)":         {cat:"Education",unit:"avg new textbook",tags:["textbook","books","college books","school"],                           p:[45,55,65,82,102,113,130,150,165,174,185,195,200,205,null]},
+  "Preschool / daycare":    {cat:"Education",unit:"avg monthly",     tags:["daycare","childcare","preschool","child care"],                        p:[648,710,785,850,960,1000,1040,1075,1120,1175,1230,1350,1500,1580,null]},
+  "Community college":      {cat:"Education",unit:"per credit hour", tags:["community college","2 year college"],                                  p:[54,62,70,80,93,102,110,120,129,137,142,149,157,163,null]},
+  "Private K-12 school":    {cat:"Education",unit:"avg annual tuition",tags:["private school","k-12","elementary","high school"],                 p:[5049,5891,7200,8399,9791,10995,11750,12310,13080,13870,14370,15420,16990,17800,null]},
+  "Student loan rate":      {cat:"Education",unit:"federal undergrad %",tags:["student loan","federal loan","interest","financial aid"],          p:[7.46,5.99,3.37,6.54,6.00,4.50,3.40,3.86,3.76,5.05,2.75,4.99,6.53,6.53,null]},
+  // HEALTHCARE
+  "Health insurance premium":{cat:"Healthcare",unit:"family plan/yr",tags:["health insurance","insurance","medical","healthcare"], fredSeries:"CUUR0000SAM2", p:[6438,8003,9950,11480,12680,13770,15745,16834,18142,19616,21342,22463,23968,25500,null]},
+  "Doctor visit (copay)":   {cat:"Healthcare",unit:"primary care copay",tags:["doctor","copay","medical","visit","physician"],                     p:[15,18,20,22,24,25,27,29,30,32,35,38,42,45,null]},
+  "Prescription drug (brand)":{cat:"Healthcare",unit:"avg brand Rx",tags:["prescription","drug","medication","pharmacy","rx","medicine"],         p:[65,93,121,155,186,213,259,302,350,405,466,534,590,620,null]},
+  "Prescription drug (generic)":{cat:"Healthcare",unit:"avg generic Rx",tags:["generic","drug","medication","pharmacy"],                         p:[18,19,20,22,25,27,30,32,32,28,24,23,22,22,null]},
+  "Insulin (vial)":         {cat:"Healthcare",unit:"per vial brand", tags:["insulin","diabetes","medication"],                                     p:[35,49,78,100,131,151,176,218,280,330,285,98,35,35,null]},
+  "Hospital stay (per day)":{cat:"Healthcare",unit:"avg per day",    tags:["hospital","surgery","inpatient","medical"],                            p:[1149,1316,1504,1730,2078,2428,2789,3000,3327,3726,4011,4459,4900,5100,null]},
+  "Dental cleaning":        {cat:"Healthcare",unit:"cleaning + xray",tags:["dental","dentist","teeth","oral health"],                              p:[99,115,131,149,169,177,189,200,215,228,245,275,305,325,null]},
+  "Braces (orthodontics)":  {cat:"Healthcare",unit:"avg full treatment",tags:["braces","orthodontist","teeth","dental"],                          p:[3800,4100,4500,4900,5100,5200,5400,5600,5800,6000,6200,6800,7500,7900,null]},
+  "Eyeglasses":             {cat:"Healthcare",unit:"frames + lenses",tags:["glasses","eyeglasses","vision","optical"],                             p:[149,179,199,219,239,249,265,279,295,299,309,329,349,365,null]},
+  "LASIK eye surgery":      {cat:"Healthcare",unit:"per eye avg",    tags:["lasik","eye surgery","vision correction"],                             p:[1950,2100,2100,2100,2200,2100,2050,2100,2099,2199,2199,2499,2599,2699,null]},
+  "Therapy session":        {cat:"Healthcare",unit:"per 50-min session",tags:["therapy","therapist","mental health","counseling","psychiatrist"],  p:[80,90,100,110,120,125,135,145,155,165,175,200,225,240,null]},
+  "Ambulance ride":         {cat:"Healthcare",unit:"avg basic transport",tags:["ambulance","ems","emergency","911"],                               p:[289,350,400,450,500,550,600,650,700,750,800,950,1100,1150,null]},
+  "Vet visit (dog/cat)":    {cat:"Healthcare",unit:"routine exam",   tags:["vet","veterinarian","pet","dog","cat"],                                p:[45,50,55,60,65,68,72,76,80,85,90,100,115,125,null]},
+  // ELECTRONICS
+  "iPhone":                 {cat:"Electronics",unit:"base model",    tags:["apple","iphone","smartphone","phone","mobile"],                        p:[null,null,null,null,499,199,199,199,649,699,699,829,799,799,null]},
+  "Samsung Galaxy S":       {cat:"Electronics",unit:"flagship base", tags:["samsung","galaxy","android","smartphone","phone"],                     p:[null,null,null,null,199,199,299,199,699,719,999,1199,1199,1199,null]},
+  "Laptop (midrange)":      {cat:"Electronics",unit:"midrange",      tags:["laptop","notebook","computer","pc","windows"],                         p:[1299,1199,1099,999,899,799,699,649,599,649,699,749,799,829,null]},
+  "MacBook Pro":            {cat:"Electronics",unit:"14-inch base",  tags:["macbook","apple","laptop","mac","computer"],                           p:[null,null,null,1999,2499,2199,2199,2499,2399,2399,2399,1999,1999,1999,null]},
+  "4K TV (55in)":           {cat:"Electronics",unit:"55-inch 4K",   tags:["tv","television","4k","smart tv","oled"],                              p:[null,null,null,null,null,2499,1999,1299,699,499,399,379,329,299,null]},
+  "iPad":                   {cat:"Electronics",unit:"base model",    tags:["ipad","apple","tablet"],                                               p:[null,null,null,null,null,499,399,299,329,329,329,449,329,329,null]},
+  "PlayStation console":    {cat:"Electronics",unit:"latest base",   tags:["playstation","ps5","sony","gaming","console","video games"],           p:[299,299,149,499,399,299,249,399,299,299,399,499,499,449,null]},
+  "Xbox console":           {cat:"Electronics",unit:"latest base",   tags:["xbox","microsoft","gaming","console","video games"],                   p:[299,179,149,299,399,199,199,499,249,299,299,499,499,449,null]},
+  "Nintendo Switch":        {cat:"Electronics",unit:"base console",  tags:["nintendo","switch","gaming","console","handheld"],                     p:[null,null,null,null,null,null,null,null,null,299,299,299,299,299,null]},
+  "Video game (AAA new)":   {cat:"Electronics",unit:"new release",   tags:["video game","game","ps5","xbox","switch","gaming"],                   p:[49.99,49.99,49.99,59.99,59.99,59.99,59.99,59.99,59.99,59.99,59.99,69.99,69.99,69.99,null]},
+  "Desktop PC (gaming)":    {cat:"Electronics",unit:"midrange gaming",tags:["gaming pc","desktop","computer","rtx"],                              p:[799,849,899,799,749,699,799,849,899,999,1199,1499,1299,1199,null]},
+  "Wireless earbuds":       {cat:"Electronics",unit:"AirPods base",  tags:["airpods","earbuds","headphones","wireless","apple"],                   p:[null,null,null,null,null,null,null,null,null,159,129,129,129,129,null]},
+  "Smart speaker":          {cat:"Electronics",unit:"Amazon Echo base",tags:["echo","alexa","google home","smart speaker"],                       p:[null,null,null,null,null,null,null,99,49,49,49,49,49,49,null]},
+  "Smartwatch":             {cat:"Electronics",unit:"Apple Watch base",tags:["smartwatch","apple watch","fitbit","wearable"],                      p:[null,null,null,null,null,null,null,null,269,279,279,249,249,249,null]},
+  "Digital camera (DSLR)":  {cat:"Electronics",unit:"midrange",      tags:["camera","dslr","canon","nikon","photography"],                        p:[499,549,549,549,599,549,599,649,649,699,699,749,799,849,null]},
+  // APPLIANCES
+  "Washing machine":        {cat:"Appliances",unit:"top-load basic", tags:["washer","washing machine","laundry","appliance"],                     p:[449,459,479,499,529,499,549,599,599,629,669,749,829,879,null]},
+  "Clothes dryer":          {cat:"Appliances",unit:"electric basic", tags:["dryer","clothes dryer","laundry","appliance"],                        p:[399,419,439,459,489,449,489,529,539,569,609,689,759,799,null]},
+  "Refrigerator":           {cat:"Appliances",unit:"French door 26cu",tags:["fridge","refrigerator","appliance"],                                 p:[799,849,899,949,999,949,999,1049,1079,1099,1199,1349,1499,1579,null]},
+  "Dishwasher":             {cat:"Appliances",unit:"standard built-in",tags:["dishwasher","appliance","kitchen"],                                 p:[349,369,389,419,449,429,449,479,499,519,549,629,699,729,null]},
+  "Microwave oven":         {cat:"Appliances",unit:"1.1cu countertop",tags:["microwave","oven","kitchen","appliance"],                            p:[79,79,79,79,89,79,79,79,79,79,79,89,99,109,null]},
+  "Air conditioner (window)":{cat:"Appliances",unit:"8000 BTU",      tags:["ac","air conditioner","window ac","cooling"],                         p:[149,159,169,179,199,189,199,219,229,239,259,299,329,349,null]},
+  "Vacuum cleaner":         {cat:"Appliances",unit:"upright midrange",tags:["vacuum","dyson","roomba","robot vacuum","hoover"],                   p:[79,89,99,109,129,119,129,149,159,169,199,229,249,259,null]},
+  "Roomba (robot vacuum)":  {cat:"Appliances",unit:"base Roomba",    tags:["roomba","robot vacuum","irobot","autonomous"],                        p:[null,null,null,null,null,299,299,349,299,249,299,349,279,279,null]},
+  "Coffee maker":           {cat:"Appliances",unit:"12-cup drip",    tags:["coffee maker","coffee machine","drip coffee"],                        p:[29,29,29,29,29,29,29,29,29,29,29,29,29,34,null]},
+  "Keurig machine":         {cat:"Appliances",unit:"base model",     tags:["keurig","coffee","pod coffee","single serve"],                        p:[null,null,null,null,null,99,79,79,79,79,89,99,109,109,null]},
+  "Instant Pot":            {cat:"Appliances",unit:"6qt base",       tags:["instant pot","pressure cooker","slow cooker","air fryer"],            p:[null,null,null,null,null,null,69,79,79,79,89,99,109,119,null]},
+  "KitchenAid stand mixer": {cat:"Appliances",unit:"5qt",            tags:["kitchenaid","stand mixer","baking","kitchen"],                        p:[299,319,349,379,399,379,399,429,449,449,449,499,499,499,null]},
+  // ENTERTAINMENT
+  "Netflix":                {cat:"Entertainment",unit:"standard/mo", tags:["netflix","streaming","subscription","movies","tv shows"],              p:[null,null,null,null,null,7.99,7.99,8.99,9.99,12.99,13.99,15.49,15.49,17.99,null]},
+  "Spotify":                {cat:"Entertainment",unit:"premium/mo",  tags:["spotify","music","streaming","podcast"],                               p:[null,null,null,null,null,9.99,9.99,9.99,9.99,9.99,9.99,9.99,11.99,11.99,null]},
+  "Disney+":                {cat:"Entertainment",unit:"with ads/mo", tags:["disney","disney+","streaming","marvel","star wars","pixar"],          p:[null,null,null,null,null,null,null,null,null,null,6.99,7.99,7.99,9.99,null]},
+  "HBO Max / Max":          {cat:"Entertainment",unit:"with ads/mo", tags:["hbo","max","streaming","hbo max","warner"],                           p:[null,null,null,null,null,null,null,null,null,14.99,14.99,9.99,9.99,9.99,null]},
+  "Amazon Prime":           {cat:"Entertainment",unit:"per month",   tags:["amazon prime","prime video","streaming","amazon"],                    p:[null,null,null,null,null,null,7.99,8.99,10.99,12.99,12.99,14.99,14.99,14.99,null]},
+  "Movie ticket":           {cat:"Entertainment",unit:"avg ticket",  tags:["movie","cinema","theater","film","amc","regal"],                      p:[5.39,5.81,6.21,6.55,7.18,7.89,8.12,8.17,8.65,9.11,9.16,10.53,11.35,11.95,null]},
+  "Concert ticket (avg)":   {cat:"Entertainment",unit:"avg live event",tags:["concert","live music","tickets","event","ticketmaster","stubhub"],  p:[38,41,49,57,67,75,80,85,95,100,105,115,148,162,null]},
+  "Disney World ticket":    {cat:"Entertainment",unit:"1-day Magic Kingdom",tags:["disney world","theme park","disney","admission"],             p:[43,49,56,67,75,80,89,99,110,129,109,109,189,199,null]},
+  "MLB game ticket":        {cat:"Entertainment",unit:"avg ticket",  tags:["baseball","mlb","ticket","sports"],                                   p:[14.97,15.76,18.12,19.82,25.40,26.74,27.73,28.94,31.00,32.99,19.00,21.00,23.00,24.00,null]},
+  "NFL game ticket":        {cat:"Entertainment",unit:"avg ticket",  tags:["football","nfl","ticket","sports"],                                   p:[45,50,62,74,81,84,94,105,109,112,92,112,123,131,null]},
+  "NBA game ticket":        {cat:"Entertainment",unit:"avg ticket",  tags:["basketball","nba","ticket","sports"],                                 p:[36,40,44,48,52,56,61,66,72,89,56,79,93,101,null]},
+  "Bowling (per game)":     {cat:"Entertainment",unit:"per game",    tags:["bowling","recreation","family fun"],                                  p:[2.50,2.75,3.00,3.25,3.75,3.99,4.25,4.49,4.75,4.99,5.25,5.99,6.49,6.99,null]},
+  "Golf round (public)":    {cat:"Entertainment",unit:"avg public course",tags:["golf","sports","recreation"],                                    p:[29,32,36,40,44,44,47,49,50,52,53,60,68,73,null]},
+  "Game Pass / PS Plus":    {cat:"Entertainment",unit:"per month",   tags:["game pass","ps plus","xbox","playstation","gaming subscription"],     p:[null,null,null,null,null,null,9.99,9.99,9.99,9.99,9.99,9.99,14.99,14.99,null]},
+  // SERVICES
+  "Gym membership":         {cat:"Services",unit:"per month",        tags:["gym","fitness","planet fitness","workout","health club"],              p:[25,27,28,30,32,33,36,38,40,42,44,49,52,55,null]},
+  "Haircut (men)":          {cat:"Services",unit:"basic cut",        tags:["haircut","barber","hair","grooming"],                                  p:[11,12,13,14,15,16,17,18,19,20,21,23,25,27,null]},
+  "Haircut (women)":        {cat:"Services",unit:"wash + cut + style",tags:["salon","hair","women haircut","blowout"],                            p:[35,38,42,46,52,56,60,65,70,75,80,90,100,108,null]},
+  "Manicure":               {cat:"Services",unit:"basic manicure",   tags:["nails","manicure","nail salon","beauty"],                             p:[12,13,14,15,17,18,19,20,22,23,24,28,32,35,null]},
+  "Pedicure":               {cat:"Services",unit:"basic pedicure",   tags:["nails","pedicure","nail salon","beauty","feet"],                      p:[18,20,22,24,26,27,29,30,32,34,36,42,48,52,null]},
+  "Postage stamp":          {cat:"Services",unit:"first class",      tags:["stamp","usps","mail","postage"],                                       p:[0.33,0.37,0.37,0.39,0.42,0.44,0.45,0.49,0.47,0.50,0.55,0.60,0.68,0.73,null]},
+  "Dry cleaning (suit)":    {cat:"Services",unit:"2-piece suit",     tags:["dry cleaning","laundry","suit","clothes"],                            p:[8.99,9.49,9.99,10.99,11.99,12.49,12.99,13.49,13.99,14.49,14.99,16.99,18.99,19.99,null]},
+  "Uber / Lyft (5 miles)":  {cat:"Services",unit:"avg 5-mile ride",  tags:["uber","lyft","rideshare","taxi","ride"],                               p:[null,null,null,null,null,6.50,7.00,7.50,9.00,10.00,12.00,14.00,16.00,18.00,null]},
+  "Domestic flight (avg)":  {cat:"Services",unit:"avg one-way fare", tags:["flight","airline","airplane","airfare","travel"],                     p:[148,133,146,163,183,164,185,196,182,229,178,279,289,305,null]},
+  "Hotel room (avg)":       {cat:"Services",unit:"avg US hotel/night",tags:["hotel","motel","lodging","travel","accommodation"],                  p:[90,95,99,105,115,98,105,115,122,130,100,148,162,170,null]},
+  "Airbnb (avg/night)":     {cat:"Services",unit:"avg nightly rate", tags:["airbnb","vacation rental","vrbo","lodging"],                         p:[null,null,null,null,null,null,80,90,110,130,105,175,180,190,null]},
+  "Oil change":             {cat:"Services",unit:"conventional full service",tags:["oil change","jiffy lube","car maintenance","mechanic"],       p:[24.99,27.99,29.99,32.99,34.99,34.99,36.99,39.99,42.99,44.99,47.99,59.99,69.99,74.99,null]},
+  "Plumber (hourly)":       {cat:"Services",unit:"per hour",         tags:["plumber","plumbing","repair","home service"],                         p:[45,49,55,60,65,68,72,78,84,90,95,110,130,140,null]},
+  "Electrician (hourly)":   {cat:"Services",unit:"per hour",         tags:["electrician","electrical","repair","home service"],                   p:[50,55,60,65,70,73,77,83,90,97,103,120,140,150,null]},
+  "Lawn mowing":            {cat:"Services",unit:"avg per visit",    tags:["lawn","mowing","landscaping","yard"],                                 p:[25,27,29,30,32,33,35,37,39,41,43,50,60,65,null]},
+  "House cleaning (2BR)":   {cat:"Services",unit:"2-bedroom home",   tags:["house cleaning","maid","cleaning service","housekeeping"],           p:[65,70,75,80,90,90,95,100,105,110,115,140,165,175,null]},
+  "Tax prep (accountant)":  {cat:"Services",unit:"avg individual return",tags:["accountant","tax","cpa","h&r block","turbotax"],                 p:[160,175,188,199,215,228,241,261,282,294,323,352,390,415,null]},
+  "Attorney (hourly)":      {cat:"Services",unit:"avg hourly",       tags:["lawyer","attorney","legal","law"],                                    p:[180,198,216,235,255,261,271,284,297,309,325,370,420,450,null]},
+  "Funeral (avg)":          {cat:"Services",unit:"with burial",      tags:["funeral","burial","cemetery","death"],                                p:[6530,7323,7323,7323,7323,7755,8343,8343,8755,8755,7848,7848,8300,8700,null]},
+  // ECONOMIC
+  "Median household income":{cat:"Economic",unit:"annual median",    tags:["income","salary","wages","earnings"],    fredSeries:"MEHOINUSA672N", p:[41990,42409,44389,48201,50303,49445,51017,53657,59039,63179,67521,70784,80610,82500,null]},
+  "Federal minimum wage":   {cat:"Economic",unit:"per hour",         tags:["minimum wage","wage","hourly","federal minimum"], fredSeries:"FEDMINNFRWG", p:[5.15,5.15,5.15,5.15,6.55,7.25,7.25,7.25,7.25,7.25,7.25,7.25,7.25,7.25,null]},
+  "S&P 500 index":          {cat:"Economic",unit:"year-end close",   tags:["sp500","stock market","stocks","investing","index"],                  p:[1498,879,1211,1418,903,1258,1426,2059,2239,2507,3756,3840,4770,5882,null]},
+  "CPI index":              {cat:"Economic",unit:"CPI-U index (base 2000=100)",tags:["cpi","inflation","consumer price index","bls"],             p:[100,105,111,117,124,127,133,137,139,144,147,162,182,198,null]},
+  // COMMODITIES
+  "Gold (oz)":              {cat:"Commodities",unit:"troy oz spot",  tags:["gold","precious metal","investment"],    fredSeries:"GOLDAMGBD228NLBM", p:[272,310,410,603,872,1224,1669,1266,1145,1268,1770,1800,2300,2900,null]},
+  "Silver (oz)":            {cat:"Commodities",unit:"troy oz spot",  tags:["silver","precious metal"],                                            p:[5.00,4.61,6.69,11.54,14.99,20.19,31.15,19.08,15.68,15.71,24.63,21.77,26.00,30.50,null]},
+  "Bitcoin":                {cat:"Commodities",unit:"1 BTC USD",     tags:["bitcoin","btc","crypto","cryptocurrency"], fredSeries:"CBBTCUSD",      p:[null,null,null,null,null,null,13.45,313,960,3742,29000,46000,42000,85000,null]},
+  "Crude oil (barrel)":     {cat:"Commodities",unit:"WTI per barrel",tags:["oil","crude oil","wti","petroleum"],                                  p:[28,26,41,66,100,79,95,93,43,65,42,95,77,71,null]},
+  "Lumber (1000 bd ft)":    {cat:"Commodities",unit:"1000 board ft", tags:["lumber","wood","2x4","construction","timber"],                        p:[250,265,365,335,255,245,280,350,350,415,940,560,445,480,null]},
+  "Copper (lb)":            {cat:"Commodities",unit:"per lb",        tags:["copper","metal","commodity","wiring"],                                 p:[0.82,0.70,1.29,3.05,3.22,3.42,3.61,3.11,2.15,2.73,3.52,4.20,3.90,4.20,null]},
+  "Corn (bushel)":          {cat:"Commodities",unit:"per bushel",    tags:["corn","grain","commodity","agriculture"],                             p:[1.85,2.32,2.06,3.04,5.18,3.69,6.89,3.70,3.61,3.61,4.53,6.54,4.53,4.30,null]},
+  "Wheat (bushel)":         {cat:"Commodities",unit:"per bushel",    tags:["wheat","grain","commodity","agriculture"],                            p:[2.62,2.78,3.40,4.26,7.77,5.70,7.77,5.99,4.89,5.17,5.05,7.65,5.52,5.30,null]},
+  "Natural gas (MMBtu)":    {cat:"Commodities",unit:"per MMBtu",     tags:["natural gas","energy","commodity","henry hub"],                       p:[4.32,3.33,5.63,6.73,8.86,4.37,2.75,4.26,2.62,3.17,2.03,6.37,2.51,2.35,null]},
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const CATS=[...new Set(Object.values(DB).map(d=>d.cat))].sort();
+let activeCat=null,tracked=[],myChart=null,showTbl=true,showCPI=false;
+let BLS_KEY=localStorage.getItem('bls_key')||'';
+let FRED_KEY=localStorage.getItem('fred_key')||'';
+let liveData={};
+
+// ── ELEMENTS ──────────────────────────────────────────────────────────────────
+const siEl=document.getElementById('si');
+const sugEl=document.getElementById('sug');
+const errEl=document.getElementById('err');
+const chipsEl=document.getElementById('chips');
+const contentEl=document.getElementById('content');
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+document.getElementById('open-modal').addEventListener('click',()=>{
+  document.getElementById('bls-in').value=BLS_KEY;
+  document.getElementById('fred-in').value=FRED_KEY;
+  document.getElementById('modal-overlay').classList.add('open');
+});
+document.getElementById('modal-cancel').addEventListener('click',()=>document.getElementById('modal-overlay').classList.remove('open'));
+document.getElementById('modal-save').addEventListener('click',async()=>{
+  BLS_KEY=document.getElementById('bls-in').value.trim();
+  FRED_KEY=document.getElementById('fred-in').value.trim();
+  localStorage.setItem('bls_key',BLS_KEY);
+  localStorage.setItem('fred_key',FRED_KEY);
+  document.getElementById('modal-overlay').classList.remove('open');
+  if(BLS_KEY||FRED_KEY) await fetchAllLiveData();
+});
+window.addEventListener('DOMContentLoaded',()=>{if(BLS_KEY||FRED_KEY)fetchAllLiveData();updateLiveStatus()});
+
+function updateLiveStatus(){
+  const dot=document.getElementById('live-dot');
+  document.getElementById('live-status').textContent=(BLS_KEY||FRED_KEY)?'Live APIs connected':'Static data';
+  (BLS_KEY||FRED_KEY)?dot.classList.add('on'):dot.classList.remove('on');
+}
+
+// ── LIVE DATA ─────────────────────────────────────────────────────────────────
+async function fetchAllLiveData(){
+  const banner=document.getElementById('live-banner');
+  banner.classList.add('show');
+  banner.innerHTML='<span class="spin"></span> Fetching latest prices from BLS &amp; FRED APIs…';
+  let fetched=0;
+
+  if(BLS_KEY){
+    try{
+      const items=Object.entries(DB).filter(([,d])=>d.blsSeries);
+      const ids=items.map(([,d])=>d.blsSeries);
+      const yr=new Date().getFullYear();
+      const res=await fetch('https://api.bls.gov/publicAPI/v2/timeseries/data/',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({seriesid:ids,startyear:String(yr-1),endyear:String(yr),annualaverage:true,registrationkey:BLS_KEY})
+      });
+      const data=await res.json();
+      if(data.status==='REQUEST_SUCCEEDED'){
+        data.Results.series.forEach(s=>{
+          const item=items.find(([,d])=>d.blsSeries===s.seriesID);
+          if(!item)return;
+          const ann=s.data.find(d=>d.period==='M13');
+          const lat=s.data.sort((a,b)=>b.year-a.year||b.period.localeCompare(a.period))[0];
+          const val=ann||lat;
+          if(val){liveData[item[0]]={value:parseFloat(val.value),year:parseInt(val.year),source:'BLS'};fetched++;}
+        });
+      }
+    }catch(e){console.warn('BLS error:',e)}
+  }
+
+  if(FRED_KEY){
+    const items=Object.entries(DB).filter(([,d])=>d.fredSeries);
+    for(const [name,d] of items){
+      try{
+        const res=await fetch(`https://fred.stlouisfed.org/graph/fredgraph.json?id=${d.fredSeries}&api_key=${FRED_KEY}&file_type=json&limit=2&sort_order=desc`);
+        const data=await res.json();
+        if(data.observations&&data.observations.length){
+          const lat=data.observations.find(o=>o.value!=='.');
+          if(lat){liveData[name]={value:parseFloat(lat.value),year:parseInt(lat.date.slice(0,4)),source:'FRED'};fetched++;}
+        }
+      }catch(e){console.warn(`FRED error ${name}:`,e)}
+    }
+  }
+
+  // Inject live values into DB price arrays
+  for(const [name,live] of Object.entries(liveData)){
+    if(!DB[name])continue;
+    const yi=YRS.indexOf(live.year);
+    if(yi>=0)DB[name].p[yi]=live.value;
+    if(live.year===2026)DB[name].p[14]=live.value;
+  }
+
+  const now=new Date().toLocaleString();
+  banner.innerHTML=`<span>🟢</span> <strong>Live data active.</strong> Updated ${fetched} price points. Last fetched: ${now}`;
+  updateLiveStatus();
+  if(tracked.length)renderAll();
+}
+
+// ── CATEGORIES ────────────────────────────────────────────────────────────────
+function buildCats(){
+  const el=document.getElementById('cats');
+  el.innerHTML=['All',...CATS].map(c=>`<button class="cf${c==='All'?' on':''}" data-cat="${c}">${c}</button>`).join('');
+  el.querySelectorAll('.cf').forEach(b=>b.addEventListener('click',()=>{
+    activeCat=b.dataset.cat==='All'?null:b.dataset.cat;
+    el.querySelectorAll('.cf').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    updateCount();
+    if(siEl.value.trim())doSuggest(siEl.value.trim());
+  }));
+}
+function updateCount(){const n=getFiltered('').length;document.getElementById('count-badge').textContent=`${n} items available${activeCat?' in '+activeCat:''}`;}
+
+// ── SEARCH ────────────────────────────────────────────────────────────────────
+function getFiltered(q){
+  const ql=q.toLowerCase().trim();
+  return Object.keys(DB).filter(k=>{
+    const d=DB[k];
+    if(activeCat&&d.cat!==activeCat)return false;
+    if(!ql)return true;
+    return k.toLowerCase().includes(ql)||d.cat.toLowerCase().includes(ql)||d.unit.toLowerCase().includes(ql)||(d.tags&&d.tags.some(t=>t.includes(ql)));
+  });
+}
+function isLive(k){return!!liveData[k]}
+function doSuggest(q){
+  const res=getFiltered(q).slice(0,12);
+  if(!res.length){sugEl.classList.remove('open');return}
+  sugEl.innerHTML=res.map(k=>`<div class="si-item" data-k="${k}"><span>${k}</span><div class="si-r">${isLive(k)?'<span class="si-live">⭐ Live</span>':''}<span class="si-unit">${DB[k].unit}</span><span class="si-cat">${DB[k].cat}</span></div></div>`).join('');
+  sugEl.classList.add('open');
+  sugEl.querySelectorAll('.si-item').forEach(el=>el.addEventListener('click',()=>{siEl.value='';sugEl.classList.remove('open');addItem(el.dataset.k)}));
+}
+siEl.addEventListener('input',()=>{const q=siEl.value.trim();if(!q){sugEl.classList.remove('open');return}doSuggest(q)});
+siEl.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){sugEl.classList.remove('open');const r=getFiltered(siEl.value.trim());if(r.length)addItem(r[0]);else showErr(`Nothing found for "${siEl.value.trim()}"`);}
+  if(e.key==='Escape')sugEl.classList.remove('open');
+});
+document.getElementById('sb').addEventListener('click',()=>{sugEl.classList.remove('open');const q=siEl.value.trim();const r=getFiltered(q);if(r.length)addItem(r[0]);else showErr(`Nothing found for "${q}". Try a different term.`);});
+document.addEventListener('click',e=>{if(!e.target.closest('#sug')&&!e.target.closest('#si'))sugEl.classList.remove('open')});
+function showErr(m){errEl.textContent=m;errEl.style.display='block';setTimeout(()=>errEl.style.display='none',3500)}
+
+// ── ADD / REMOVE ──────────────────────────────────────────────────────────────
+function addItem(key){
+  if(!key||!DB[key])return;
+  if(tracked.find(t=>t.key===key)){showErr(`${key} is already on the chart.`);return}
+  if(tracked.length>=5){showErr('Max 5 products at once. Remove one first.');return}
+  tracked.push({key,color:PAL[tracked.length%PAL.length]});
+  siEl.value='';
+  renderAll();
+}
+window.removeItem=function(i){tracked.splice(i,1);tracked.forEach((t,j)=>t.color=PAL[j%PAL.length]);renderAll()};
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function renderAll(){
+  renderChips();
+  if(!tracked.length){
+    contentEl.innerHTML='<div class="empty"><div class="empty-icon">📈</div>Search for a product above to see its price history</div>';
+    if(myChart){myChart.destroy();myChart=null}
+    return;
+  }
+  contentEl.innerHTML=`
+    <div class="metrics" id="metrics"></div>
+    <div class="chart-card fade-in">
+      <div class="chart-top"><div class="chart-title">Price history 2000 – 2026</div><div class="leg" id="leg"></div></div>
+      <div class="chart-wrap"><canvas id="mc" role="img" aria-label="Price history chart 2000 to 2026"></canvas></div>
+      <div class="chart-ctrls">
+        <label><input type="checkbox" id="chk-tbl" checked> Show data table</label>
+        <label><input type="checkbox" id="chk-cpi"> Overlay CPI baseline</label>
+      </div>
+    </div>
+    <div id="tbl-area"></div>`;
+  renderMetrics();renderChart();renderTbl();
+  document.getElementById('chk-tbl').addEventListener('change',e=>{showTbl=e.target.checked;renderTbl()});
+  document.getElementById('chk-cpi').addEventListener('change',e=>{showCPI=e.target.checked;updateChart()});
+}
+
+function renderChips(){
+  chipsEl.innerHTML=tracked.map((t,i)=>`<div class="chip" style="color:${t.color};border-color:${t.color}55;background:${t.color}15">
+    <span>${t.key}</span><span class="chip-cat">${DB[t.key].cat}</span>${isLive(t.key)?'<span class="chip-live">⭐</span>':''}
+    <button onclick="removeItem(${i})">×</button></div>`).join('');
+}
+
+function renderMetrics(){
+  const el=document.getElementById('metrics');if(!el)return;
+  el.innerHTML=tracked.map(t=>{
+    const d=DB[t.key];
+    const vals=d.p.map((v,i)=>v!==null?{y:YRS[i],v}:null).filter(Boolean);
+    if(!vals.length)return'';
+    const first=vals[0],last=vals[vals.length-1];
+    const pct=((last.v-first.v)/first.v*100).toFixed(0);
+    const clr=pct>0?'var(--red)':'var(--green)';
+    const ls=liveData[t.key]?`<span style="color:var(--green);font-size:10px"> ⭐${liveData[t.key].source}</span>`:'';
+    return`<div class="metric fade-in"><div class="metric-lbl"><span class="m-dot" style="background:${t.color}"></span>${t.key}</div><div class="metric-val">$${Number(last.v).toLocaleString()}</div><div class="metric-sub">${d.unit} &nbsp;·&nbsp; <span style="color:${clr}">${pct>0?'+':''}${pct}%</span> since ${first.y}${ls}</div></div>`;
+  }).join('')+`<div class="metric fade-in"><div class="metric-lbl">Overall CPI 2000–2025</div><div class="metric-val">+98%</div><div class="metric-sub">US Bureau of Labor Statistics</div></div>`;
+}
+
+function getDatasets(){
+  const ds=tracked.map(t=>({label:t.key,data:DB[t.key].p.slice(),borderColor:t.color,backgroundColor:t.color+'18',borderWidth:2.5,pointRadius:3,pointHoverRadius:7,tension:0.35,fill:false,spanGaps:true}));
+  if(showCPI&&tracked.length){
+    const d=DB[tracked[0].key];
+    const bi=d.p.findIndex(v=>v!==null);
+    const bv=d.p[bi],bc=CPI[bi];
+    ds.push({label:'CPI baseline',data:YRS.map((_,i)=>i>=bi&&CPI[i]!==null?parseFloat((bv*(CPI[i]/bc)).toFixed(2)):null),borderColor:'#484f58',borderDash:[6,4],borderWidth:1.5,pointRadius:0,tension:0.2,fill:false,spanGaps:true});
+  }
+  return ds;
+}
+function renderChart(){
+  const cv=document.getElementById('mc');if(!cv)return;
+  if(myChart)myChart.destroy();
+  myChart=new Chart(cv,{type:'line',data:{labels:YRS,datasets:getDatasets()},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#1c2330',borderColor:'rgba(255,255,255,.08)',borderWidth:1,titleColor:'#8b949e',bodyColor:'#e6edf3',padding:10,callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.parsed.y!==null?'$'+Number(ctx.parsed.y).toLocaleString():'N/A'}`}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{font:{size:11,family:'DM Sans'},color:'#484f58'}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{font:{size:11,family:'DM Sans'},color:'#484f58',callback:v=>'$'+(v>=10000?(v/1000).toFixed(0)+'k':Number(v).toLocaleString())}}}}});
+  renderLeg();
+}
+function updateChart(){if(!myChart)return;myChart.data.datasets=getDatasets();myChart.update();renderLeg();}
+function renderLeg(){
+  const el=document.getElementById('leg');if(!el)return;
+  el.innerHTML=tracked.map(t=>`<span class="leg-item"><span class="leg-dot" style="background:${t.color}"></span>${t.key}${isLive(t.key)?'<span style="color:var(--green);margin-left:3px">⭐</span>':''}</span>`).join('');
+  if(showCPI)el.innerHTML+=`<span class="leg-item"><span class="leg-dot" style="background:#484f58"></span>CPI baseline</span>`;
+}
+function renderTbl(){
+  const el=document.getElementById('tbl-area');if(!el||!showTbl||!tracked.length){if(el)el.innerHTML='';return}
+  const hdrs=`<tr><th>Year</th>${tracked.map(t=>`<th style="color:${t.color}">${t.key}</th>`).join('')}<th>CPI vs 2000</th></tr>`;
+  const rows=YRS.map((yr,i)=>{
+    const cells=tracked.map(t=>{
+      const cur=DB[t.key].p[i];
+      if(cur===null||cur===undefined)return`<td class="na">—</td>`;
+      const lf=isLive(t.key)&&liveData[t.key]&&liveData[t.key].year===yr?'<span style="color:var(--green);font-size:10px"> ⭐</span>':'';
+      let arr='';
+      for(let j=i-1;j>=0;j--){const pv=DB[t.key].p[j];if(pv!==null&&pv!==undefined){arr=cur>pv?'<span class="up"> ↑</span>':cur<pv?'<span class="dn"> ↓</span>':'';break}}
+      return`<td>$${Number(cur).toLocaleString()}${arr}${lf}</td>`;
+    }).join('');
+    const cv=CPI[i]!==null?`+${((CPI[i]-1)*100).toFixed(0)}%`:'—';
+    return`<tr><td style="font-weight:500;color:#8b949e">${yr}</td>${cells}<td class="na">${cv}</td></tr>`;
+  }).join('');
+  el.innerHTML=`<div class="tbl-card fade-in"><table><thead>${hdrs}</thead><tbody>${rows}</tbody></table></div>`;
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+buildCats();
+updateCount();
+</script>
+</body>
+</html>
